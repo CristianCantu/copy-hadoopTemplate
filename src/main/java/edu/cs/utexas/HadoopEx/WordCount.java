@@ -6,6 +6,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
@@ -32,35 +33,63 @@ public class WordCount extends Configured implements Tool {
 	 * 
 	 */
 	public int run(String args[]) {
-		try {
-			Configuration conf = new Configuration();
 
-			Job job = new Job(conf, "WordCount");
-			job.setJarByClass(WordCount.class);
+        boolean success = runFlightJob(args[0], args[1]);
+        if (!success) return 1;
 
-			// specify a Mapper
-			job.setMapperClass(WordCountMapper.class);
+        success = runDelayJob(args[0], args[2]);
+        return success ? 0 : 1;
+    }
 
-			// specify a Reducer
-			job.setReducerClass(WordCountReducer.class);
+    private boolean runFlightJob(String inputPath, String outputPath) {
+        try {
+            Configuration conf = new Configuration();
+            Job job = Job.getInstance(conf, "Flight Count");
+            job.setJarByClass(WordCount.class);
 
-			// specify output types
-			job.setOutputKeyClass(Text.class);
-			job.setOutputValueClass(IntWritable.class);
+            job.setMapperClass(FlightMapper.class);
+            job.setReducerClass(FlightReducer.class);
 
-			// specify input and output directories
-			FileInputFormat.addInputPath(job, new Path(args[0]));
-			job.setInputFormatClass(TextInputFormat.class);
+            job.setOutputKeyClass(Text.class);
+            job.setOutputValueClass(IntWritable.class);
 
-			FileOutputFormat.setOutputPath(job, new Path(args[1]));
-			job.setOutputFormatClass(TextOutputFormat.class);
+            FileInputFormat.addInputPath(job, new Path(inputPath));
+            job.setInputFormatClass(TextInputFormat.class);
 
-			return (job.waitForCompletion(true) ? 0 : 1);
+            FileOutputFormat.setOutputPath(job, new Path(outputPath));
+            job.setOutputFormatClass(TextOutputFormat.class);
 
-		} catch (InterruptedException | ClassNotFoundException | IOException e) {
-			System.err.println("Error during mapreduce job.");
-			e.printStackTrace();
-			return 2;
-		}
-	}
+            return job.waitForCompletion(true);
+        } catch (InterruptedException | ClassNotFoundException | IOException e) {
+            System.err.println("Error during flight count job.");
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    private boolean runDelayJob(String inputPath, String outputPath) {
+        try {
+            Configuration conf = new Configuration();
+            Job job = Job.getInstance(conf, "Delay Ratio");
+            job.setJarByClass(WordCount.class);
+
+            job.setMapperClass(DelayMapper.class);
+            job.setReducerClass(DelayReducer.class);
+
+            job.setOutputKeyClass(Text.class);
+            job.setOutputValueClass(FloatWritable.class); 
+
+            FileInputFormat.addInputPath(job, new Path(inputPath));
+            job.setInputFormatClass(TextInputFormat.class);
+
+            FileOutputFormat.setOutputPath(job, new Path(outputPath));
+            job.setOutputFormatClass(TextOutputFormat.class);
+
+            return job.waitForCompletion(true);
+        } catch (InterruptedException | ClassNotFoundException | IOException e) {
+            System.err.println("Error during delay ratio job.");
+            e.printStackTrace();
+            return false;
+        }
+    }
 }
